@@ -1,0 +1,20 @@
+# Optional overlay for microservices generated before the curriculum data API was
+# added to the template. Copy this file and services/shark-attack-data-api into the
+# existing microservice's playground directory.
+services:
+  shark-attack-data-api:
+    profiles: ["curriculum-data"]
+    build:
+      context: ./services/shark-attack-data-api
+    image: nebulae-university/shark-attack-data-api:local
+    ports:
+      - "${SHARK_ATTACK_API_PORT:-8989}:8080"
+    environment:
+      PORT: 8080
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped

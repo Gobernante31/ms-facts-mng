@@ -1,0 +1,9 @@
+*
+!generate_playground.sh
+!.gitignore
+!docker-compose.yml
+!docker-compose.curriculum-data.yml
+!nats-server.conf
+!services/
+!services/shark-attack-data-api/
+!services/shark-attack-data-api/**
