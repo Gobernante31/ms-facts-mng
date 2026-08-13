@@ -6,17 +6,19 @@ const { of, Observable, defer } = require("rxjs");
 
 const { CustomError } = require("@nebulae/backend-node-tools").error;
 
-const CollectionName = 'SharkAttack';
+const CollectionName = "SharkAttack";
 
 class SharkAttackDA {
   static start$(mongoDbInstance) {
-    return Observable.create(observer => {
+    return Observable.create((observer) => {
       if (mongoDbInstance) {
         mongoDB = mongoDbInstance;
         observer.next(`${this.name} using given mongo instance`);
       } else {
         mongoDB = require("../../../tools/mongo-db/MongoDB").singleton();
-        observer.next(`${this.name} using singleton system-wide mongo instance`);
+        observer.next(
+          `${this.name} using singleton system-wide mongo instance`,
+        );
       }
       observer.next(`${this.name} started`);
       observer.complete();
@@ -30,14 +32,13 @@ class SharkAttackDA {
     const collection = mongoDB.db.collection(CollectionName);
 
     const query = {
-      _id: id, organizationId
+      _id: id,
+      organizationId,
     };
     return defer(() => collection.findOne(query)).pipe(
       map((res) => {
-        return res !== null
-          ? { ...res, id: res._id }
-          : {}
-      })
+        return res !== null ? { ...res, id: res._id } : {};
+      }),
     );
   }
 
@@ -59,8 +60,8 @@ class SharkAttackDA {
     const collection = mongoDB.db.collection(CollectionName);
     const { page = 0, count = 10 } = pagination;
 
-    const query = this.generateListingQuery(filter);    
-    const projection = { name: 1, active: 1 };
+    const query = this.generateListingQuery(filter);
+    const projection = { date: 1, country: 1, type: 1, species: 1 };
 
     let cursor = collection
       .find(query, { projection })
@@ -75,41 +76,82 @@ class SharkAttackDA {
     }
     cursor = cursor.sort(sort);
 
-
-    return mongoDB.extractAllFromMongoCursor$(cursor).pipe(
-      map(res => ({ ...res, id: res._id }))
-    );
+    return mongoDB
+      .extractAllFromMongoCursor$(cursor)
+      .pipe(map((res) => ({ ...res, id: res._id })));
   }
 
   static getSharkAttackSize$(filter = {}) {
     const collection = mongoDB.db.collection(CollectionName);
-    const query = this.generateListingQuery(filter);    
+    const query = this.generateListingQuery(filter);
     return defer(() => collection.countDocuments(query));
   }
 
   /**
-  * creates a new SharkAttack 
-  * @param {*} id SharkAttack ID
-  * @param {*} SharkAttack properties
-  */
+   * creates a new SharkAttack
+   * @param {*} id SharkAttack ID
+   * @param {*} SharkAttack properties
+   */
   static createSharkAttack$(_id, properties, createdBy) {
-
-    const metadata = { createdBy, createdAt: Date.now(), updatedBy: createdBy, updatedAt: Date.now() };
+    const metadata = {
+      createdBy,
+      createdAt: Date.now(),
+      updatedBy: createdBy,
+      updatedAt: Date.now(),
+    };
     const collection = mongoDB.db.collection(CollectionName);
-    return defer(() => collection.insertOne({
-      _id,
-      ...properties,
-      metadata,
-    })).pipe(
-      map(({ insertedId }) => ({ id: insertedId, ...properties, metadata }))
+    return defer(() =>
+      collection.insertOne({
+        _id,
+        ...properties,
+        metadata,
+      }),
+    ).pipe(
+      map(({ insertedId }) => ({ id: insertedId, ...properties, metadata })),
     );
   }
 
   /**
-  * modifies the SharkAttack properties
-  * @param {String} id  SharkAttack ID
-  * @param {*} SharkAttack properties to update
-  */
+   * Bulk imports SharkAttack documents, matching on record id (_id) so a
+   * re-import replaces existing records instead of duplicating them.
+   * @param {Array<{_id: String, ...}>} sharkAttacks documents, each with an _id
+   * @param {String} createdBy user that triggered the import
+   */
+  static createSharkAttacks$(sharkAttacks, createdBy) {
+    if (!sharkAttacks || sharkAttacks.length === 0) {
+      return of({ upserted: 0, matched: 0, modified: 0 });
+    }
+    const collection = mongoDB.db.collection(CollectionName);
+    const ops = sharkAttacks.map(({ _id, ...properties }) => ({
+      replaceOne: {
+        filter: { _id },
+        replacement: {
+          _id,
+          ...properties,
+          metadata: {
+            createdBy,
+            createdAt: Date.now(),
+            updatedBy: createdBy,
+            updatedAt: Date.now(),
+          },
+        },
+        upsert: true,
+      },
+    }));
+    return defer(() => collection.bulkWrite(ops, { ordered: false })).pipe(
+      map((res) => ({
+        upserted: res.upsertedCount,
+        matched: res.matchedCount,
+        modified: res.modifiedCount,
+      })),
+    );
+  }
+
+  /**
+   * modifies the SharkAttack properties
+   * @param {String} id  SharkAttack ID
+   * @param {*} SharkAttack properties to update
+   */
   static updateSharkAttack$(_id, properties, updatedBy) {
     const collection = mongoDB.db.collection(CollectionName);
     return defer(() =>
@@ -118,23 +160,28 @@ class SharkAttackDA {
         {
           $set: {
             ...properties,
-            "metadata.updatedBy": updatedBy, "metadata.updatedAt": Date.now()
-          }
+            "metadata.updatedBy": updatedBy,
+            "metadata.updatedAt": Date.now(),
+          },
         },
         {
           returnOriginal: false,
-        }
-      )
+        },
+      ),
     ).pipe(
-      map(result => result && result.value ? { ...result.value, id: result.value._id } : undefined)
+      map((result) =>
+        result && result.value
+          ? { ...result.value, id: result.value._id }
+          : undefined,
+      ),
     );
   }
 
   /**
-  * modifies the SharkAttack properties
-  * @param {String} id  SharkAttack ID
-  * @param {*} SharkAttack properties to update
-  */
+   * modifies the SharkAttack properties
+   * @param {String} id  SharkAttack ID
+   * @param {*} SharkAttack properties to update
+   */
   static updateSharkAttackFromRecovery$(_id, properties, av) {
     const collection = mongoDB.db.collection(CollectionName);
     return defer(() =>
@@ -145,55 +192,49 @@ class SharkAttackDA {
         { $set: { ...properties } },
         {
           returnOriginal: false,
-          upsert: true
-        }
-      )
+          upsert: true,
+        },
+      ),
     ).pipe(
-      map(result => result && result.value ? { ...result.value, id: result.value._id } : undefined)
+      map((result) =>
+        result && result.value
+          ? { ...result.value, id: result.value._id }
+          : undefined,
+      ),
     );
   }
 
   /**
-  * modifies the SharkAttack properties
-  * @param {String} id  SharkAttack ID
-  * @param {*} SharkAttack properties to update
-  */
+   * modifies the SharkAttack properties
+   * @param {String} id  SharkAttack ID
+   * @param {*} SharkAttack properties to update
+   */
   static replaceSharkAttack$(_id, properties) {
     const collection = mongoDB.db.collection(CollectionName);
-    return defer(() =>
-      collection.replaceOne(
-        { _id },
-        properties,
-      )
-    ).pipe(
-      mapTo({ id: _id, ...properties })
+    return defer(() => collection.replaceOne({ _id }, properties)).pipe(
+      mapTo({ id: _id, ...properties }),
     );
   }
 
   /**
-    * deletes an SharkAttack 
-    * @param {*} _id  SharkAttack ID
-  */
+   * deletes an SharkAttack
+   * @param {*} _id  SharkAttack ID
+   */
   static deleteSharkAttack$(_id) {
     const collection = mongoDB.db.collection(CollectionName);
-    return defer(() =>
-      collection.deleteOne({ _id })
-    );
+    return defer(() => collection.deleteOne({ _id }));
   }
 
   /**
-    * deletes multiple SharkAttack at once
-    * @param {*} _ids  SharkAttack IDs array
-  */
+   * deletes multiple SharkAttack at once
+   * @param {*} _ids  SharkAttack IDs array
+   */
   static deleteSharkAttacks$(_ids) {
     const collection = mongoDB.db.collection(CollectionName);
-    return defer(() =>
-      collection.deleteMany({ _id: { $in: _ids } })
-    ).pipe(
-      map(({ deletedCount }) => deletedCount > 0)
+    return defer(() => collection.deleteMany({ _id: { $in: _ids } })).pipe(
+      map(({ deletedCount }) => deletedCount > 0),
     );
   }
-
 }
 /**
  * @returns {SharkAttackDA}

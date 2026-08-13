@@ -9,31 +9,68 @@ type FactsMngSharkAttack {
   "SharkAttack ID"
   id: ID!
   "name"
-  name: String!
+  name: String
   "organization id"
   organizationId: String!
   "SharkAttack description"
   description: String
   "SharkAttack active flag"
-  active: Boolean!  
+  active: Boolean
+  "The date of the incident."
+  date: String
+  "The year of the incident."
+  year: String
+  "The type of shark attack."
+  type: String
+  "The country where the incident occurred."
+  country: String
+  "The specific area where the incident occurred."
+  area: String
+  "The specific location of the incident."
+  location: String
+  "The activity the victim was engaged in."
+  activity: String
+  "The sex of the victim."
+  sex: String
+  "The age of the victim."
+  age: String
+  "The outcome of the incident."
+  injury: String
+  "Whether the incident was fatal (Y/N)."
+  fatal_y_n: String
+  "The time of the incident."
+  time: String
+  "The species of shark involved."
+  species: String
+  "The investigator or source of the report."
+  investigator_or_source: String
+  "The name of the associated PDF file."
+  pdf: String
+  "The formula for the link to the PDF file."
+  href_formula: String
+  "The direct link to the PDF file."
+  href: String
+  "The case number assigned to the incident."
+  case_number: String
+  "An alternative case number for the incident."
+  case_number0: String
   "object metadata"
   metadata: FactsMngSharkAttackMetadata
 }
 
 type FactsMngSharkAttackMetadata {
-    createdBy: String
-		createdAt: BigInt
-		updatedBy: String
-		updatedAt: BigInt
+  createdBy: String
+  createdAt: BigInt
+  updatedBy: String
+  updatedAt: BigInt
 }
 
 type FactsMngSharkAttackListing {
   "Listing"
   listing: [FactsMngSharkAttack]
   "query total result count"
-  queryTotalResultCount: Int,  
+  queryTotalResultCount: Int
 }
-
 
 input FactsMngSharkAttackFilterInput {
   "Name"
@@ -54,8 +91,8 @@ input FactsMngSharkAttackPaginationInput {
 }
 
 input FactsMngSharkAttackSortInput {
-  field: String!,
-  asc: Boolean!,
+  field: String!
+  asc: Boolean!
 }
 
 input FactsMngSharkAttackInput {
@@ -67,25 +104,112 @@ input FactsMngSharkAttackInput {
   description: String
   "SharkAttack active flag"
   active: Boolean
+  "The date of the incident."
+  date: String
+  "The year of the incident."
+  year: String
+  "The type of shark attack."
+  type: String
+  "The country where the incident occurred."
+  country: String
+  "The specific area where the incident occurred."
+  area: String
+  "The specific location of the incident."
+  location: String
+  "The activity the victim was engaged in."
+  activity: String
+  "The sex of the victim."
+  sex: String
+  "The age of the victim."
+  age: String
+  "The outcome of the incident."
+  injury: String
+  "Whether the incident was fatal (Y/N)."
+  fatal_y_n: String
+  "The time of the incident."
+  time: String
+  "The species of shark involved."
+  species: String
+  "The investigator or source of the report."
+  investigator_or_source: String
+  "The name of the associated PDF file."
+  pdf: String
+  "The formula for the link to the PDF file."
+  href_formula: String
+  "The direct link to the PDF file."
+  href: String
+  "The case number assigned to the incident."
+  case_number: String
+  "An alternative case number for the incident."
+  case_number0: String
 }
 
+input FactsMngSharkAttackImportInput {
+  "organization id"
+  organizationId: String!
+}
+
+type FactsMngImportSharkAttacksResponse {
+  "Response code"
+  code: Int
+  "Response message"
+  message: String
+  "Number of records imported"
+  count: Int
+}
+
+type FactsMngRelatedSharkAttack {
+  "The name of the victim."
+  name: String
+  "The date of the incident."
+  date: String
+  "The type of shark attack."
+  type: String
+  "The country where the incident occurred."
+  country: String
+  "The location of the incident."
+  location: String
+  "The activity the victim was engaged in."
+  activity: String
+  "The outcome of the incident."
+  injury: String
+  "The direct link to the PDF file."
+  href: String
+}
 
 type Query {
   "Get SharkAttacks filtered "
-  FactsMngSharkAttackListing(filterInput: FactsMngSharkAttackFilterInput, paginationInput: FactsMngSharkAttackPaginationInput, sortInput: FactsMngSharkAttackSortInput): FactsMngSharkAttackListing
+  FactsMngSharkAttackListing(
+    filterInput: FactsMngSharkAttackFilterInput
+    paginationInput: FactsMngSharkAttackPaginationInput
+    sortInput: FactsMngSharkAttackSortInput
+  ): FactsMngSharkAttackListing
   "Get SharkAttack by its id"
   FactsMngSharkAttack(id: ID!, organizationId: String!): FactsMngSharkAttack
+  "Get up to 5 related SharkAttack cases from the same country"
+  FactsMngSharkAttackRelatedCases(
+    country: String!
+  ): [FactsMngRelatedSharkAttack]
 }
 
 type Mutation {
   "Create a new SharkAttack"
-  FactsMngCreateSharkAttack(input: FactsMngSharkAttackInput!): FactsMngSharkAttack
+  FactsMngCreateSharkAttack(
+    input: FactsMngSharkAttackInput!
+  ): FactsMngSharkAttack
   "Update an SharkAttack"
-  FactsMngUpdateSharkAttack(id: ID!, input: FactsMngSharkAttackInput!, merge: Boolean!): FactsMngSharkAttack  
+  FactsMngUpdateSharkAttack(
+    id: ID!
+    input: FactsMngSharkAttackInput!
+    merge: Boolean!
+  ): FactsMngSharkAttack
   "Deletes an SharkAttack"
-  FactsMngDeleteSharkAttacks(ids: [ID]!): CommandResponse  
+  FactsMngDeleteSharkAttacks(ids: [ID]!): CommandResponse
+  "Import SharkAttacks from OpenDataSoft"
+  FactsMngImportSharkAttacks(
+    input: FactsMngSharkAttackImportInput!
+  ): FactsMngImportSharkAttacksResponse
 }
-
 
 type Subscription {
   "This events is triggered when a sharkAttack updated or deleted"
