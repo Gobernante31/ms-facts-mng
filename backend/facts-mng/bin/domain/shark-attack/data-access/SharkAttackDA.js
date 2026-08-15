@@ -1,8 +1,8 @@
 "use strict";
 
 let mongoDB = undefined;
-const { map, mapTo } = require("rxjs/operators");
-const { of, Observable, defer } = require("rxjs");
+const { map, mapTo, mergeMap, toArray } = require("rxjs/operators");
+const { of, Observable, defer, forkJoin } = require("rxjs");
 
 const { CustomError } = require("@nebulae/backend-node-tools").error;
 
@@ -85,6 +85,48 @@ class SharkAttackDA {
     const collection = mongoDB.db.collection(CollectionName);
     const query = this.generateListingQuery(filter);
     return defer(() => collection.countDocuments(query));
+  }
+
+  /**
+   * Returns dashboard statistics using the MongoDB Aggregation Framework.
+   * - totalAttacks: total number of persisted SharkAttack documents
+   * - attacksByCountry: top 5 countries by attack count
+   * - attacksByYear: attack count grouped by year (chronological)
+   * @returns {Observable<{totalAttacks:number, attacksByCountry:Array, attacksByYear:Array}>}
+   */
+  static getDashboardStats$() {
+    const collection = mongoDB.db.collection(CollectionName);
+
+    const total$ = defer(() => collection.countDocuments({}));
+
+    const byCountry$ = mongoDB
+      .extractAllFromMongoCursor$(
+        collection.aggregate([
+          { $group: { _id: "$country", count: { $sum: 1 } } },
+          { $sort: { count: -1 } },
+          { $limit: 5 },
+          { $project: { _id: 0, country: "$_id", count: 1 } },
+        ]),
+      )
+      .pipe(toArray());
+
+    const byYear$ = mongoDB
+      .extractAllFromMongoCursor$(
+        collection.aggregate([
+          { $group: { _id: "$year", count: { $sum: 1 } } },
+          { $sort: { _id: 1 } },
+          { $project: { _id: 0, year: "$_id", count: 1 } },
+        ]),
+      )
+      .pipe(toArray());
+
+    return forkJoin(total$, byCountry$, byYear$).pipe(
+      map(([totalAttacks, attacksByCountry, attacksByYear]) => ({
+        totalAttacks,
+        attacksByCountry,
+        attacksByYear,
+      })),
+    );
   }
 
   /**

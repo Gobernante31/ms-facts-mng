@@ -373,7 +373,7 @@ function SharkAttack(props) {
 
               <div className="flex items-center max-w-full">
                 <FuseAnimate animation="transition.expandIn" delay={300}>
-                  <Icon className="text-32 sm:text-48 mr-12">business</Icon>
+                  <Icon className="text-32 sm:text-48 mr-12">warning</Icon>
                 </FuseAnimate>
 
                 <div className="flex flex-col min-w-0">

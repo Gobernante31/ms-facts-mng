@@ -84,6 +84,10 @@ class SharkAttackCRUD {
           fn: instance.getSharkAttackRelatedCases$,
           jwtValidation: { roles: READ_ROLES, attributes: REQUIRED_ATTRIBUTES },
         },
+        "emigateway.graphql.query.FactsMngSharkAttackDashboardStats": {
+          fn: instance.getDashboardStats$,
+          jwtValidation: { roles: READ_ROLES, attributes: REQUIRED_ATTRIBUTES },
+        },
       },
     };
   }
@@ -319,8 +323,10 @@ class SharkAttackCRUD {
 
   /**
    * Import SharkAttacks from the OpenDataSoft global-shark-attack catalog.
-   * Fetches 100 records, stores each one using original_order as _id and
-   * emits a Reported event per imported record.
+   * Fetches up to `limit` records and emits one `SharkAttackReported` event
+   * per record. The persistence to MongoDB is performed by the event-sourcing
+   * consumer (SharkAttackES.handleSharkAttackReported$), making the import
+   * fully event-driven and idempotent on re-import.
    */
   importSharkAttacks$({ root, args, jwt }, authToken) {
     const limit = 100;
@@ -334,40 +340,24 @@ class SharkAttackCRUD {
               record.original_order !== undefined,
           )
           .map((record) => instance.mapToSharkAttack(record, organizationId));
-        return SharkAttackDA.createSharkAttacks$(
-          docs,
-          authToken.preferred_username,
-        ).pipe(map(() => docs));
+        return from(docs).pipe(
+          mergeMap((doc) =>
+            eventSourcing.emitEvent$(
+              instance.buildSharkAttackReportedEvent(doc._id, authToken, doc),
+              { autoAcknowledgeKey: process.env.MICROBACKEND_KEY },
+            ),
+          ),
+          toArray(),
+          map(() => docs),
+        );
       }),
       mergeMap((docs) =>
-        forkJoin(
-          CqrsResponseHelper.buildSuccessResponse$({
-            code: 200,
-            message: `${docs.length} SharkAttacks imported`,
-            count: docs.length,
-          }),
-          from(docs).pipe(
-            mergeMap((doc) => {
-              // Publish + persist the Reported event; persistencia local garantiza
-              // el criterio de Event Sourcing aunque no corra un ms-event-store externo.
-              const event = instance.buildReportedEvent(
-                "SharkAttact",
-                doc._id,
-                authToken,
-                doc,
-              );
-              return forkJoin(
-                eventSourcing.emitEvent$(event, {
-                  autoAcknowledgeKey: process.env.MICROBACKEND_KEY,
-                }),
-                eventSourcing.storeEvent$(event),
-              );
-            }),
-            toArray(),
-          ),
-        ),
+        CqrsResponseHelper.buildSuccessResponse$({
+          code: 200,
+          message: `${docs.length} SharkAttackReported events emitted`,
+          count: docs.length,
+        }),
       ),
-      map(([successResponse]) => successResponse),
       catchError((err) =>
         iif(
           () => err.name === "MongoTimeoutError",
@@ -424,18 +414,36 @@ class SharkAttackCRUD {
   }
 
   /**
-   * Builds a Reported Event, the event-sourcing event required on import.
-   * @param {String} aggregateType
+   * Gets the dashboard statistics for the SharkAttack materialized view.
+   */
+  getDashboardStats$({ args }, authToken) {
+    return SharkAttackDA.getDashboardStats$().pipe(
+      mergeMap((rawResponse) =>
+        CqrsResponseHelper.buildSuccessResponse$(rawResponse),
+      ),
+      catchError((err) =>
+        iif(
+          () => err.name === "MongoTimeoutError",
+          throwError(err),
+          CqrsResponseHelper.handleError$(err),
+        ),
+      ),
+    );
+  }
+
+  /**
+   * Builds a SharkAttackReported Event, the event-sourcing event required on
+   * import. The event consumer persists the record to MongoDB.
    * @param {String} aggregateId
    * @param {*} authToken
    * @param {*} data
    * @returns {Event}
    */
-  buildReportedEvent(aggregateType, aggregateId, authToken, data) {
+  buildSharkAttackReportedEvent(aggregateId, authToken, data) {
     return new Event({
-      eventType: "Reported",
+      eventType: "SharkAttackReported",
       eventTypeVersion: 1,
-      aggregateType,
+      aggregateType: "SharkAttack",
       aggregateId,
       data,
       user: authToken.preferred_username,
